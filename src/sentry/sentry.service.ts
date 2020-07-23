@@ -72,7 +72,7 @@ export class SentryService {
 							type: "section",
 							text: {
 								type: "mrkdwn",
-								text: `${status.charAt(0).toUpperCase() + status.slice(1)} by *${user.username}*`
+								text: `*${status.charAt(0).toUpperCase() + status.slice(1)}* by <@${user.username}>`
 							}
 						},
 					],
