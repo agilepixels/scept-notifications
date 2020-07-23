@@ -18,6 +18,6 @@ export class SentryGuard implements CanActivate {
 const verifySignature = (request: Request, secret: string) => {
   const hmac = crypto.createHmac('sha256', secret);
   hmac.update(JSON.stringify(request.body), 'utf8');
-  const digest = hmac.digest('hex');
-  return digest === request.headers['Sentry-Hook-Signature'];
+	const digest = hmac.digest('hex');
+  return digest === request.headers['sentry-hook-signature'];
 }

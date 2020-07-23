@@ -1,29 +1,32 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, HttpService } from '@nestjs/common';
 import { Request } from 'express';
 import { SlackService } from '../slack/slack.service';
+import { IBaseSlackUser } from '../slack/interfaces/base-slack-user.interface';
 
 @Injectable()
 export class SentryService {
 	constructor(
 		private readonly slackService: SlackService,
+		private readonly httpService: HttpService,
 	) {}
 
 	async handleWebhook(request: Request, body: any) {
 		const resource = request.get("sentry-hook-resource");
 		const { action } = body;
-		
+
+	
 		if (resource === "issue" && action === "created") {
-			const {id, permalink, metadata: { type, value } } = body.data.issue;
+			const {id, metadata: { type, value } } = body.data.issue;
+			const url = process.env.BASE_SENTRY_URL + `/${id}`
 			await this.slackService.sendMessage({
 				username: 'Sentry',
 				text: type,
-				icon_emoji: ':zap:',
 				blocks: [
 					{
 						type: "section",
 						text: {
 							type: "mrkdwn",
-							text: `<${permalink}|*${type}*> \n ${value}`
+							text: `<${url}|*${type}*> \n ${value}`
 						}
 					},
 					{
@@ -33,16 +36,50 @@ export class SentryService {
 								type: "button",
 								text: {
 									type: "plain_text",
-									text: "Ignore",
-									emoji: true
+									text: "Resolve"
 								},
-								value: "Ignore"
-							}
+								value: `${id}`,
+								style: 'primary',
+								action_id: 'resolveIssue'
+							},
+							{
+								type: "button",
+								text: {
+									type: "plain_text",
+									text: "Ignore"
+								},
+								value: `${id}`,
+								action_id: 'ignoreIssue'
+							},
 						]
 					}
-				]
-			})
+				],
+			}).catch(console.log)
 		}
-	
+	}
+
+	async updateIssue(issueId: string, user: IBaseSlackUser, message: any, response_url: string, status: 'ignored' | 'resolved') {
+		await this.httpService.put(`https://sentry.io/api/0/issues/${issueId}/`, { status })
+			.toPromise()
+			.catch(console.error)
+			.then(() => {
+				const response = {
+					username: 'Sentry',
+					text: message.text,
+					blocks: [
+						message.blocks[0],
+						{
+							type: "section",
+							text: {
+								type: "mrkdwn",
+								text: `${status.charAt(0).toUpperCase() + status.slice(1)} by *${user.username}*`
+							}
+						},
+					],
+				}
+				this.httpService.post(response_url, response)
+				.toPromise()
+				.catch(console.error)
+			})
 	}
 }
